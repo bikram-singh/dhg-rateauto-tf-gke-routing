@@ -1,0 +1,215 @@
+name: "Deploy to GCP"
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to (dev, test, stage, prod)"
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - stage
+          - prod
+
+      gke_cluster_name:
+        description: "Gke cluster name to deploy to"
+        required: true
+        type: choice
+        options:
+          - opera-dev-agents-gke-cluster
+          - opera-stage-agents-gke-cluster
+          - opera-prod-agents-gke-cluster
+          - rate-automation-dev-gke-cluster
+          - rate-automation-stage-gke-cluster
+          - rate-automation-prod-gke-cluster
+          - portfolio-management-dev-gke-cluster
+
+      cluster_region:
+        description: "Region of the GCP cluster"
+        required: true
+        default: "us-central1"
+
+      directory:
+        description: "Directory path containing YAML files to apply e.g. opera/dev"
+        required: true
+
+jobs:
+  deploy:
+    permissions: write-all
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download and Set CA Certificate
+        run: |
+          curl -s https://repo1.uhc.com/artifactory/UHG-certificates/standard_trusts.pem -o /tmp/ca_certs.pem
+          if [ -f /tmp/ca_certs.pem ]; then
+            echo "CLOUDSDK_CORE_CUSTOM_CA_CERTS_FILE=/tmp/ca_certs.pem" >> $GITHUB_ENV
+          else
+            echo "Failed to download certificate"
+            exit 1
+          fi
+
+      - name: Set Project ID, Workload Identity Provider, and Cluster Name
+        id: set-project
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "dev" || "${{ github.event.inputs.environment }}" == "stage" || "${{ github.event.inputs.environment }}" == "test" ]]; then
+            echo "PROJECT_ID=elgdanah-ablf-qo1-1ssl-13bp85" >> $GITHUB_ENV
+            echo "WORKLOAD_IDENTITY_PROVIDER=projects/895341627204/locations/global/workloadIdentityPools/github/providers/uhc-tech-provider-org" >> $GITHUB_ENV
+          elif [[ "${{ github.event.inputs.environment }}" == "prod" ]]; then
+            echo "PROJECT_ID=defgdevt-6d9lh-qbys-atmvsk" >> $GITHUB_ENV
+            echo "WORKLOAD_IDENTITY_PROVIDER=projects/294215649411/locations/global/workloadIdentityPools/github/providers/uhc-tech-provider-org" >> $GITHUB_ENV
+          else
+            echo "Invalid environment specified" >&2
+            exit 1
+          fi
+
+      - name: Authenticate to GCP
+        uses: uhc-tech-provider/search-pes-aws-horus-scripts/.github/actions/gcp-authentication-actions-role@HorusGHA_v3.0.0_TEST
+        with:
+          environment: ${{ github.event.inputs.environment }}
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: opera-github-deploysvc@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+
+      - name: Extract and Validate Static IP from Ingress
+        run: |
+          INGRESS_FILE="${{ github.event.inputs.directory }}/ingress.yaml"
+
+          if [ ! -f "$INGRESS_FILE" ]; then
+            echo "WARNING: ingress.yaml not found in ${{ github.event.inputs.directory }}"
+            echo "Skipping static IP and DNS validation"
+            exit 0
+          fi
+
+          STATIC_IP_NAME=$(grep -oP 'kubernetes.io/ingress.global-static-ip-name:\s*"\K[^"]+' "$INGRESS_FILE")
+
+          if [ -z "$STATIC_IP_NAME" ]; then
+            echo "WARNING: Could not extract ingress.global-static-ip-name from $INGRESS_FILE"
+            echo "Skipping static IP and DNS validation"
+            exit 0
+          fi
+
+          echo "Static IP Name: $STATIC_IP_NAME"
+
+          IP_ADDRESS=$(gcloud compute addresses describe "$STATIC_IP_NAME" \
+            --project ${{ env.PROJECT_ID }} \
+            --region ${{ github.event.inputs.cluster_region }} \
+            --format="value(address)" 2>/dev/null || echo "")
+
+          if [ -z "$IP_ADDRESS" ]; then
+            echo "Not found as regional IP, checking global..."
+            IP_ADDRESS=$(gcloud compute addresses describe "$STATIC_IP_NAME" \
+              --project ${{ env.PROJECT_ID }} \
+              --global \
+              --format="value(address)" 2>/dev/null || echo "")
+          fi
+
+          if [ -z "$IP_ADDRESS" ]; then
+            echo "Static IP does not exist: $STATIC_IP_NAME (will be created in next step)"
+            echo "IP_EXISTS=false" >> $GITHUB_ENV
+          else
+            echo "Static IP validated: $IP_ADDRESS"
+            echo "IP_EXISTS=true" >> $GITHUB_ENV
+          fi
+
+          echo "INGRESS_IP=$IP_ADDRESS" >> $GITHUB_ENV
+          echo "STATIC_IP_NAME=$STATIC_IP_NAME" >> $GITHUB_ENV
+
+          HOSTS=$(grep -oP 'host:\s*\K\S+' "$INGRESS_FILE" | tr '\n' ',' | sed 's/,$//')
+          echo "Hosts from ingress: $HOSTS"
+          echo "INGRESS_HOSTS=$HOSTS" >> $GITHUB_ENV
+
+      - name: Validate DNS Records in GCP Cloud DNS
+        if: env.INGRESS_HOSTS != ''
+        run: |
+          IP_ADDRESS="${{ env.INGRESS_IP }}"
+          HOSTS="${{ env.INGRESS_HOSTS }}"
+
+          echo "Validating DNS records for IP: $IP_ADDRESS"
+          echo "Hosts: $HOSTS"
+
+          IFS=',' read -ra HOST_ARRAY <<< "$HOSTS"
+
+          VALIDATION_PASSED=true
+
+          for HOST in "${HOST_ARRAY[@]}"; do
+            HOST=$(echo "$HOST" | xargs)
+            echo "Validating host: $HOST"
+
+            DNS_ZONE=$(echo "$HOST" | sed 's/^[^.]*\.//')
+            echo "Determined DNS zone: $DNS_ZONE"
+
+            ZONE_NAME=$(gcloud dns managed-zones list \
+              --project ${{ env.PROJECT_ID }} \
+              --format="value(name)" \
+              --filter="dnsName=$DNS_ZONE." | head -1 || echo "")
+
+            if [ -z "$ZONE_NAME" ]; then
+              echo "VALIDATION ERROR: DNS zone $DNS_ZONE not found"
+              VALIDATION_PASSED=false
+              continue
+            fi
+
+            echo "Zone found: $ZONE_NAME"
+
+            EXISTING_RECORD=$(gcloud dns record-sets list \
+              --zone="$ZONE_NAME" \
+              --project ${{ env.PROJECT_ID }} \
+              --filter="name=$HOST." \
+              --format="value(rrdatas[0])" 2>/dev/null || echo "")
+
+            if [ -z "$EXISTING_RECORD" ]; then
+              echo "DNS record does not exist for host: $HOST (will be created in next step)"
+              VALIDATION_PASSED=false
+            elif [ "$EXISTING_RECORD" == "$IP_ADDRESS" ]; then
+              echo "DNS record validated and matches IP: $HOST -> $IP_ADDRESS"
+            else
+              echo "DNS record exists but has different IP: $HOST -> $EXISTING_RECORD (will be updated)"
+              VALIDATION_PASSED=false
+            fi
+          done
+
+          if [ "$VALIDATION_PASSED" = false ]; then
+            echo "DNS_RECORDS_VALID=false" >> $GITHUB_ENV
+          else
+            echo "DNS_RECORDS_VALID=true" >> $GITHUB_ENV
+          fi
+
+      - name: Create Global Static IP if Not Exists
+        if: env.IP_EXISTS == 'false'
+        run: |
+          STATIC_IP_NAME="${{ env.STATIC_IP_NAME }}"
+          echo "Creating global static IP: $STATIC_IP_NAME"
+
+          gcloud compute addresses create "$STATIC_IP_NAME" \
+            --project ${{ env.PROJECT_ID }} \
+            --global
+
+          IP_ADDRESS=$(gcloud compute addresses describe "$STATIC_IP_NAME" \
+            --project ${{ env.PROJECT_ID }} \
+            --global \
+            --format="value(address)")
+
+          echo "Global Static IP created successfully: $IP_ADDRESS"
+          echo "INGRESS_IP=$IP_ADDRESS" >> $GITHUB_ENV
+
+      - name: Install gke-gcloud-auth-plugin
+        run: |
+          gcloud components install gke-gcloud-auth-plugin
+
+      - name: Connect to GCP cluster
+        run: |
+          gcloud container clusters get-credentials ${{ github.event.inputs.gke_cluster_name }} \
+            --region ${{ github.event.inputs.cluster_region }} \
+            --project ${{ env.PROJECT_ID }}
+
+      - name: Apply YAML files
+        run: |
+          for file in ${{ github.event.inputs.directory }}/*.yaml; do
+            kubectl apply -f $file
+          done

@@ -1,0 +1,8 @@
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: dhg-rateauto-dev-cert
+  namespace: dhg-rateauto-dev-namespace
+spec:
+  domains:
+    - gcpcloudhub.shop
