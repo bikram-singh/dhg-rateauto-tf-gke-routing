@@ -1,0 +1,7 @@
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: dhg-rateauto-test-frontend-config
+  namespace: dhg-rateauto-test-namespace
+spec:
+  sslPolicy: dhg-rateauto-ssl-pol

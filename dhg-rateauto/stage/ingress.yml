@@ -1,0 +1,51 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dhg-rateauto-stage-ingress
+  namespace: dhg-rateauto-stage-namespace
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    networking.gke.io/managed-certificates: dhg-rateauto-stage-cert
+    kubernetes.io/ingress.global-static-ip-name: "dhg-rateauto-stage-static-ip"
+    kubernetes.io/ingress.allow-http: "false"
+    networking.gke.io/v1beta1.FrontendConfig: dhg-rateauto-stage-frontend-config
+
+spec:
+  rules:
+    - host: gcpcloudhub.shop
+      http:
+        paths:
+
+          # Vaccine Fee
+          - path: /vaccinefee/api
+            pathType: Prefix
+            backend:
+              service:
+                name: dhg-rateauto-vaccinefee-service
+                port:
+                  number: 5000
+
+          - path: /vaccinefee
+            pathType: Prefix
+            backend:
+              service:
+                name: dhg-rateauto-vaccinefee-service
+                port:
+                  number: 80
+
+          # NextGen Data
+          - path: /nextgen-data/api
+            pathType: Prefix
+            backend:
+              service:
+                name: dhg-rateauto-nextgen-data-service
+                port:
+                  number: 5000
+
+          - path: /nextgen-data
+            pathType: Prefix
+            backend:
+              service:
+                name: dhg-rateauto-nextgen-data-service
+                port:
+                  number: 80

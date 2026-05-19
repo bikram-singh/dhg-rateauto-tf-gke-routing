@@ -1,0 +1,9 @@
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: dhg-rateauto-stage-backend-config
+  namespace: dhg-rateauto-stage-namespace
+spec:
+  timeoutSec: 1500
+  securityPolicy:
+    name: dhg-rateauto-widget-ui-pol

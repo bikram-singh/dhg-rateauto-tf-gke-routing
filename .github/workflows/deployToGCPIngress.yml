@@ -78,10 +78,10 @@ jobs:
 
       - name: Extract and Validate Static IP from Ingress
         run: |
-          INGRESS_FILE="${{ github.event.inputs.directory }}/ingress.yaml"
+          INGRESS_FILE="${{ github.event.inputs.directory }}/ingress.yml"
 
           if [ ! -f "$INGRESS_FILE" ]; then
-            echo "WARNING: ingress.yaml not found in ${{ github.event.inputs.directory }}"
+            echo "WARNING: ingress.yml not found in ${{ github.event.inputs.directory }}"
             echo "Skipping static IP and DNS validation"
             exit 0
           fi
@@ -210,6 +210,6 @@ jobs:
 
       - name: Apply YAML files
         run: |
-          for file in ${{ github.event.inputs.directory }}/*.yaml; do
+          for file in ${{ github.event.inputs.directory }}/*.yml; do
             kubectl apply -f $file
           done

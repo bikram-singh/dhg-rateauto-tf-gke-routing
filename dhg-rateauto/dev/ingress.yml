@@ -16,20 +16,20 @@ spec:
       http:
         paths:
 
-          # Fee Sources
-          - path: /feesources/api
+          # Vaccine Fee
+          - path: /vaccinefee/api
             pathType: Prefix
             backend:
               service:
-                name: dhg-rateauto-fee-sources-service
+                name: dhg-rateauto-vaccinefee-service
                 port:
                   number: 5000
 
-          - path: /feesources
+          - path: /vaccinefee
             pathType: Prefix
             backend:
               service:
-                name: dhg-rateauto-fee-sources-service
+                name: dhg-rateauto-vaccinefee-service
                 port:
                   number: 80
 
