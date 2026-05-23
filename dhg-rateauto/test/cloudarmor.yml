@@ -1,12 +1,14 @@
 apiVersion: cloud.google.com/v1
 kind: BackendConfig
 metadata:
-  name: dhg-rateauto-test-backend-config
-  namespace: dhg-rateauto-test-namespace
+  name: dhg-rateauto-dev-backend-config
+  namespace: dhg-rateauto-dev-namespace
 spec:
   timeoutSec: 1500
-  securityPolicy:
-    name: dhg-rateauto-widget-ui-pol
+  # NOTE: Cloud Armor security policies require a paid GCP project.
+  # Quota 'SECURITY_POLICIES' is 0 on free tier. Uncomment below when on a paid project.
+  # securityPolicy:
+  #   name: dhg-rateauto-widget-ui-pol
   healthCheck:
     checkIntervalSec: 30
     timeoutSec: 10
