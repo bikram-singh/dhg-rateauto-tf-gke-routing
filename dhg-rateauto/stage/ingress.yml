@@ -32,20 +32,3 @@ spec:
                 name: dhg-rateauto-vaccinefee-service
                 port:
                   number: 80
-
-          # NextGen Data
-          - path: /nextgen-data/api
-            pathType: Prefix
-            backend:
-              service:
-                name: dhg-rateauto-nextgen-data-service
-                port:
-                  number: 5000
-
-          - path: /nextgen-data
-            pathType: Prefix
-            backend:
-              service:
-                name: dhg-rateauto-nextgen-data-service
-                port:
-                  number: 80
