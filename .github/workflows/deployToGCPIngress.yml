@@ -55,7 +55,7 @@ jobs:
           if [[ "${{ github.event.inputs.environment }}" == "dev" || \
                 "${{ github.event.inputs.environment }}" == "test" || \
                 "${{ github.event.inputs.environment }}" == "stage" ]]; then
-            echo "PROJECT_ID=${{ secrets.GCP_PROJECT_ID_NONPROD }}" >> $GITHUB_ENV
+            echo "PROJECT_ID=dhg-vaccine-rateauto-nonpord" >> $GITHUB_ENV
             echo "WORKLOAD_IDENTITY_PROVIDER=${{ secrets.GCP_WIF_PROVIDER_NONPROD }}" >> $GITHUB_ENV
           else
             echo "Invalid environment specified" >&2
@@ -92,7 +92,7 @@ jobs:
             echo "Creating SSL policy dhg-rateauto-ssl-pol..."
             gcloud compute ssl-policies create dhg-rateauto-ssl-pol \
               --profile=MODERN \
-              --min-tls-version=TLS_1_2 \
+              --min-tls-version=1.2 \
               --project=${{ env.PROJECT_ID }}
             echo "✅ SSL policy created"
           fi
