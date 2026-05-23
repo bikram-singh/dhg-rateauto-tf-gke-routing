@@ -7,3 +7,9 @@ spec:
   timeoutSec: 1500
   securityPolicy:
     name: dhg-rateauto-widget-ui-pol
+  healthCheck:
+    checkIntervalSec: 30
+    timeoutSec: 10
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+    type: HTTP

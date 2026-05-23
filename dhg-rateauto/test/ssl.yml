@@ -5,3 +5,6 @@ metadata:
   namespace: dhg-rateauto-test-namespace
 spec:
   sslPolicy: dhg-rateauto-ssl-pol
+  redirectToHttps:
+    enabled: true
+    responseCodeName: MOVED_PERMANENTLY_DEFAULT

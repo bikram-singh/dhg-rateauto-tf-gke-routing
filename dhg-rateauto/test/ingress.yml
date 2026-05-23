@@ -5,18 +5,19 @@ metadata:
   namespace: dhg-rateauto-test-namespace
   annotations:
     kubernetes.io/ingress.class: "gce"
-    networking.gke.io/managed-certificates: dhg-rateauto-test-cert
+    networking.gke.io/managed-certificates: "dhg-rateauto-test-cert"
     kubernetes.io/ingress.global-static-ip-name: "dhg-rateauto-test-static-ip"
     kubernetes.io/ingress.allow-http: "false"
-    networking.gke.io/v1beta1.FrontendConfig: dhg-rateauto-test-frontend-config
-
+    networking.gke.io/v1beta1.FrontendConfig: "dhg-rateauto-test-frontend-config"
 spec:
   rules:
     - host: gcpcloudhub.shop
       http:
         paths:
 
-          # Vaccine Fee
+          # ------------------------------------------------------------
+          # Vaccine Fee — API
+          # ------------------------------------------------------------
           - path: /vaccinefee/api
             pathType: Prefix
             backend:
@@ -25,6 +26,9 @@ spec:
                 port:
                   number: 5000
 
+          # ------------------------------------------------------------
+          # Vaccine Fee — UI
+          # ------------------------------------------------------------
           - path: /vaccinefee
             pathType: Prefix
             backend:
