@@ -16,23 +16,13 @@ spec:
         paths:
  
           # ------------------------------------------------------------
-          # Vaccine Fee — API
+          # Vaccine Fee — New UI (dhg-vaccinefee-ui)
+          # Routes: gcpcloudhub.shop/vaccinefee-ui
           # ------------------------------------------------------------
-          - path: /vaccinefee/api
+          - path: /vaccinefee-ui
             pathType: Prefix
             backend:
               service:
-                name: dhg-rateauto-vaccinefee-service
-                port:
-                  number: 5000
- 
-          # ------------------------------------------------------------
-          # Vaccine Fee — UI
-          # ------------------------------------------------------------
-          - path: /vaccinefee
-            pathType: Prefix
-            backend:
-              service:
-                name: dhg-rateauto-vaccinefee-service
+                name: dhg-vaccinefee-ui-service
                 port:
                   number: 80
