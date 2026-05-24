@@ -81,9 +81,6 @@ jobs:
  
       # ------------------------------------------------------------------
       # 5. Create SSL Policy and Cloud Armor policy if they don't exist
-      #    NOTE: Cloud Armor security policies require a paid GCP project.
-      #    Quota 'SECURITY_POLICIES' is 0 on free tier.
-      #    Uncomment the Cloud Armor block below when on a paid project.
       # ------------------------------------------------------------------
       - name: Create SSL Policy and Cloud Armor Policy if not exist
         run: |
@@ -100,17 +97,23 @@ jobs:
             echo "✅ SSL policy created"
           fi
  
-          # ---- Cloud Armor Security Policy ----
-          # NOTE: Cloud Armor security policies require a paid GCP project.
-          # Quota 'SECURITY_POLICIES' is 0 on free tier. Uncomment below when on a paid project.
-          #
+          # ----------------------------------------------------------------
+          # Cloud Armor Security Policy
+          # ----------------------------------------------------------------
+          # CURRENT STATUS: Commented out — quota not yet approved
+          # TO ENABLE:
+          #   1. Request quota increase for SECURITY_POLICIES at:
+          #      https://console.cloud.google.com/iam-admin/quotas
+          #   2. Search "SECURITY_POLICIES" → Edit Quotas → request 5
+          #   3. Once approved, uncomment the block below and re-run workflow
+          # ----------------------------------------------------------------
           # if gcloud compute security-policies describe dhg-rateauto-widget-ui-pol \
           #     --project=${{ env.PROJECT_ID }} &>/dev/null; then
           #   echo "✅ Cloud Armor policy dhg-rateauto-widget-ui-pol already exists — skipping"
           # else
           #   echo "Creating Cloud Armor policy dhg-rateauto-widget-ui-pol..."
           #   gcloud compute security-policies create dhg-rateauto-widget-ui-pol \
-          #     --description="Cloud Armor security policy for dhg-rateauto" \
+          #     --description="Cloud Armor security policy for DHG RateAuto" \
           #     --project=${{ env.PROJECT_ID }}
           #   echo "✅ Cloud Armor policy created"
           # fi
@@ -119,7 +122,10 @@ jobs:
       # 6. Extract static IP name from ingress.yml and validate / create
       # ------------------------------------------------------------------
       - name: Extract and Validate Static IP from Ingress
+        shell: bash
         run: |
+          set +e  # Disable exit on error for this step
+ 
           INGRESS_FILE="${{ github.event.inputs.directory }}/ingress.yml"
  
           if [ ! -f "$INGRESS_FILE" ]; then
@@ -129,8 +135,9 @@ jobs:
           fi
  
           STATIC_IP_NAME=$(grep -oP 'kubernetes.io/ingress.global-static-ip-name:\s*"\K[^"]+' "$INGRESS_FILE")
+          GREP_EXIT=$?
  
-          if [ -z "$STATIC_IP_NAME" ]; then
+          if [ $GREP_EXIT -ne 0 ] || [ -z "$STATIC_IP_NAME" ]; then
             echo "WARNING: Could not extract static IP name from ingress.yml"
             echo "IP_EXISTS=skip" >> $GITHUB_ENV
             exit 0
@@ -139,13 +146,13 @@ jobs:
           echo "Static IP Name: $STATIC_IP_NAME"
           echo "STATIC_IP_NAME=$STATIC_IP_NAME" >> $GITHUB_ENV
  
-          # Check global IP (GCE Ingress requires global)
           IP_ADDRESS=$(gcloud compute addresses describe "$STATIC_IP_NAME" \
             --project ${{ env.PROJECT_ID }} \
             --global \
-            --format="value(address)" 2>/dev/null || echo "")
+            --format="value(address)" 2>/dev/null)
+          GCLOUD_EXIT=$?
  
-          if [ -z "$IP_ADDRESS" ]; then
+          if [ $GCLOUD_EXIT -ne 0 ] || [ -z "$IP_ADDRESS" ]; then
             echo "Static IP $STATIC_IP_NAME does not exist — will create."
             echo "IP_EXISTS=false" >> $GITHUB_ENV
           else
@@ -154,10 +161,11 @@ jobs:
             echo "INGRESS_IP=$IP_ADDRESS" >> $GITHUB_ENV
           fi
  
-          # Extract hosts for DNS validation
-          HOSTS=$(grep -oP 'host:\s*\K\S+' "$INGRESS_FILE" | tr '\n' ',' | sed 's/,$//')
+          HOSTS=$(grep -oP 'host:\s*\K\S+' "$INGRESS_FILE" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
           echo "Hosts: $HOSTS"
           echo "INGRESS_HOSTS=$HOSTS" >> $GITHUB_ENV
+ 
+          exit 0
  
       # ------------------------------------------------------------------
       # 7. Create global static IP if it doesn't exist yet
