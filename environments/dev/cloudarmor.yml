@@ -5,8 +5,16 @@ metadata:
   namespace: dhg-rateauto-dev-namespace
 spec:
   timeoutSec: 1500
-  securityPolicy:
-    name: dhg-rateauto-widget-ui-pol
+  # ----------------------------------------------------------------
+  # Cloud Armor — Uncomment when security policy is created
+  # Requires paid GCP account + quota increase for SECURITY_POLICIES
+  # Create policy first:
+  #   gcloud compute security-policies create dhg-rateauto-widget-ui-pol \
+  #     --description="Cloud Armor security policy for DHG RateAuto" \
+  #     --project=dhg-vaccine-rateauto-nonpord
+  # ----------------------------------------------------------------
+  # securityPolicy:
+  #   name: dhg-rateauto-widget-ui-pol
   healthCheck:
     checkIntervalSec: 30
     timeoutSec: 10
