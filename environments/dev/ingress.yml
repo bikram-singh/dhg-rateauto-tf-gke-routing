@@ -4,17 +4,17 @@ metadata:
   name: dhg-rateauto-dev-ingress
   namespace: dhg-rateauto-dev-namespace
   annotations:
-    kubernetes.io/ingress.class: "gce"
     networking.gke.io/managed-certificates: "dhg-rateauto-dev-cert"
     kubernetes.io/ingress.global-static-ip-name: "dhg-rateauto-dev-static-ip"
     kubernetes.io/ingress.allow-http: "false"
     networking.gke.io/v1beta1.FrontendConfig: "dhg-rateauto-dev-frontend-config"
 spec:
+  ingressClassName: gce
   rules:
     - host: gcpcloudhub.shop
       http:
         paths:
-
+ 
           # ------------------------------------------------------------
           # Vaccine Fee — API
           # ------------------------------------------------------------
@@ -25,7 +25,7 @@ spec:
                 name: dhg-rateauto-vaccinefee-service
                 port:
                   number: 5000
-
+ 
           # ------------------------------------------------------------
           # Vaccine Fee — UI
           # ------------------------------------------------------------
