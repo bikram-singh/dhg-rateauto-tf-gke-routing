@@ -10,6 +10,14 @@ spec:
   hostnames:
     - dev.gcpcloudhub.shop
   rules:
+    # Vaccine Fee - API backend
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /vaccinefee/api
+      backendRefs:
+        - name: dhg-vaccinefee-api-service
+          port: 80
     # Vaccine Fee - UI and all sub-paths
     - matches:
         - path:
@@ -18,7 +26,7 @@ spec:
       backendRefs:
         - name: dhg-vaccinefee-ui-service
           port: 80
-    # Static assets
+    # Static assets for UI
     - matches:
         - path:
             type: PathPrefix
@@ -26,19 +34,3 @@ spec:
       backendRefs:
         - name: dhg-vaccinefee-ui-service
           port: 80
-    # Vaccine Fee - API (backend - coming soon)
-    # - matches:
-    #     - path:
-    #         type: PathPrefix
-    #         value: /vaccinefee/api
-    #   backendRefs:
-    #     - name: dhg-rateauto-vaccinefee-service
-    #       port: 5000
-    # Vaccine Fee - Backend UI (coming soon)
-    # - matches:
-    #     - path:
-    #         type: PathPrefix
-    #         value: /vaccinefee
-    #   backendRefs:
-    #     - name: dhg-rateauto-vaccinefee-service
-    #       port: 80
