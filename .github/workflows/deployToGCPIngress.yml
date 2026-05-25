@@ -1,9 +1,9 @@
 name: "Deploy Ingress to GCP"
- 
+
 permissions:
   id-token: write
   contents: read
- 
+
 on:
   workflow_dispatch:
     inputs:
@@ -15,7 +15,7 @@ on:
           - dev
           - test
           - stage
- 
+
       gke_cluster_name:
         description: "GKE cluster name to deploy to"
         required: true
@@ -24,28 +24,28 @@ on:
           - dhg-rateauto-dev-gke-cluster
           - dhg-rateauto-test-gke-cluster
           - dhg-rateauto-stage-gke-cluster
- 
+
       cluster_region:
         description: "Region of the GCP cluster"
         required: true
         default: "us-central1"
- 
+
       directory:
         description: "Directory path containing YAML files to apply (e.g. environments/dev)"
         required: true
- 
+
 jobs:
   deploy:
     permissions: write-all
     runs-on: ubuntu-latest
- 
+
     steps:
       # ------------------------------------------------------------------
-      # 1. Checkout repo so YAML files are available on the runner
+      # 1. Checkout repo
       # ------------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
- 
+
       # ------------------------------------------------------------------
       # 2. Resolve project ID and Workload Identity Provider per env
       # ------------------------------------------------------------------
@@ -61,16 +61,16 @@ jobs:
             echo "Invalid environment specified" >&2
             exit 1
           fi
- 
+
       # ------------------------------------------------------------------
-      # 3. Authenticate to GCP via Workload Identity Federation
+      # 3. Authenticate to GCP
       # ------------------------------------------------------------------
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT_NONPROD }}
- 
+
       # ------------------------------------------------------------------
       # 4. Set up gcloud SDK
       # ------------------------------------------------------------------
@@ -78,185 +78,134 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
- 
+
       # ------------------------------------------------------------------
-      # 5. Create SSL Policy and Cloud Armor policy if they don't exist
+      # 5. Create SSL Policy if not exists
       # ------------------------------------------------------------------
-      - name: Create SSL Policy and Cloud Armor Policy if not exist
+      - name: Create SSL Policy if not exists
         run: |
-          # ---- SSL Policy ----
           if gcloud compute ssl-policies describe dhg-rateauto-ssl-pol \
               --project=${{ env.PROJECT_ID }} &>/dev/null; then
-            echo "✅ SSL policy dhg-rateauto-ssl-pol already exists — skipping"
+            echo "SSL policy dhg-rateauto-ssl-pol already exists - skipping"
           else
             echo "Creating SSL policy dhg-rateauto-ssl-pol..."
             gcloud compute ssl-policies create dhg-rateauto-ssl-pol \
               --profile=MODERN \
               --min-tls-version=1.2 \
               --project=${{ env.PROJECT_ID }}
-            echo "✅ SSL policy created"
+            echo "SSL policy created"
           fi
- 
+
           # ----------------------------------------------------------------
           # Cloud Armor Security Policy
           # ----------------------------------------------------------------
-          # CURRENT STATUS: Commented out — quota not yet approved
+          # CURRENT STATUS: Commented out - quota not yet approved
           # TO ENABLE:
           #   1. Request quota increase for SECURITY_POLICIES at:
           #      https://console.cloud.google.com/iam-admin/quotas
-          #   2. Search "SECURITY_POLICIES" → Edit Quotas → request 5
+          #   2. Search "SECURITY_POLICIES" -> Edit Quotas -> request 5
           #   3. Once approved, uncomment the block below and re-run workflow
           # ----------------------------------------------------------------
           # if gcloud compute security-policies describe dhg-rateauto-widget-ui-pol \
           #     --project=${{ env.PROJECT_ID }} &>/dev/null; then
-          #   echo "✅ Cloud Armor policy dhg-rateauto-widget-ui-pol already exists — skipping"
+          #   echo "Cloud Armor policy already exists - skipping"
           # else
-          #   echo "Creating Cloud Armor policy dhg-rateauto-widget-ui-pol..."
           #   gcloud compute security-policies create dhg-rateauto-widget-ui-pol \
           #     --description="Cloud Armor security policy for DHG RateAuto" \
           #     --project=${{ env.PROJECT_ID }}
-          #   echo "✅ Cloud Armor policy created"
           # fi
- 
+
       # ------------------------------------------------------------------
-      # 6. Extract static IP name from ingress.yml and validate / create
+      # 6. Extract and validate static IP
       # ------------------------------------------------------------------
-      - name: Extract and Validate Static IP from Ingress
+      - name: Extract and Validate Static IP from Gateway
         shell: bash
         run: |
-          set +e  # Disable exit on error for this step
- 
-          INGRESS_FILE="${{ github.event.inputs.directory }}/ingress.yml"
- 
-          if [ ! -f "$INGRESS_FILE" ]; then
-            echo "WARNING: ingress.yml not found in ${{ github.event.inputs.directory }}"
+          set +e
+
+          GATEWAY_FILE="${{ github.event.inputs.directory }}/gateway.yml"
+
+          if [ ! -f "$GATEWAY_FILE" ]; then
+            echo "WARNING: gateway.yml not found"
             echo "IP_EXISTS=skip" >> $GITHUB_ENV
             exit 0
           fi
- 
-          STATIC_IP_NAME=$(grep -oP 'kubernetes.io/ingress.global-static-ip-name:\s*"\K[^"]+' "$INGRESS_FILE")
+
+          STATIC_IP_NAME=$(grep -oP 'value:\s*\K\S+' "$GATEWAY_FILE" | head -1)
           GREP_EXIT=$?
- 
+
           if [ $GREP_EXIT -ne 0 ] || [ -z "$STATIC_IP_NAME" ]; then
-            echo "WARNING: Could not extract static IP name from ingress.yml"
+            echo "WARNING: Could not extract static IP name"
             echo "IP_EXISTS=skip" >> $GITHUB_ENV
             exit 0
           fi
- 
+
           echo "Static IP Name: $STATIC_IP_NAME"
           echo "STATIC_IP_NAME=$STATIC_IP_NAME" >> $GITHUB_ENV
- 
+
           IP_ADDRESS=$(gcloud compute addresses describe "$STATIC_IP_NAME" \
             --project ${{ env.PROJECT_ID }} \
             --global \
             --format="value(address)" 2>/dev/null)
           GCLOUD_EXIT=$?
- 
+
           if [ $GCLOUD_EXIT -ne 0 ] || [ -z "$IP_ADDRESS" ]; then
-            echo "Static IP $STATIC_IP_NAME does not exist — will create."
+            echo "Static IP $STATIC_IP_NAME does not exist - will create."
             echo "IP_EXISTS=false" >> $GITHUB_ENV
           else
             echo "Static IP found: $IP_ADDRESS"
             echo "IP_EXISTS=true" >> $GITHUB_ENV
             echo "INGRESS_IP=$IP_ADDRESS" >> $GITHUB_ENV
           fi
- 
-          HOSTS=$(grep -oP 'host:\s*\K\S+' "$INGRESS_FILE" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
-          echo "Hosts: $HOSTS"
-          echo "INGRESS_HOSTS=$HOSTS" >> $GITHUB_ENV
- 
+
           exit 0
- 
+
       # ------------------------------------------------------------------
-      # 7. Create global static IP if it doesn't exist yet
+      # 7. Create global static IP if it doesn't exist
       # ------------------------------------------------------------------
       - name: Create Global Static IP if Not Exists
         if: env.IP_EXISTS == 'false'
         run: |
           STATIC_IP_NAME="${{ env.STATIC_IP_NAME }}"
           echo "Creating global static IP: $STATIC_IP_NAME"
- 
+
           gcloud compute addresses create "$STATIC_IP_NAME" \
             --project ${{ env.PROJECT_ID }} \
             --global
- 
+
           IP_ADDRESS=$(gcloud compute addresses describe "$STATIC_IP_NAME" \
             --project ${{ env.PROJECT_ID }} \
             --global \
             --format="value(address)")
- 
+
           echo "Static IP created: $IP_ADDRESS"
           echo "INGRESS_IP=$IP_ADDRESS" >> $GITHUB_ENV
- 
+
       # ------------------------------------------------------------------
-      # 8. Validate DNS records in Cloud DNS
-      # ------------------------------------------------------------------
-      - name: Validate DNS Records
-        if: env.INGRESS_HOSTS != '' && env.IP_EXISTS != 'skip'
-        run: |
-          IP_ADDRESS="${{ env.INGRESS_IP }}"
-          HOSTS="${{ env.INGRESS_HOSTS }}"
- 
-          IFS=',' read -ra HOST_ARRAY <<< "$HOSTS"
-          DNS_RECORDS_VALID=true
- 
-          for HOST in "${HOST_ARRAY[@]}"; do
-            HOST=$(echo "$HOST" | xargs)
-            DNS_ZONE=$(echo "$HOST" | sed 's/^[^.]*\.//')
- 
-            ZONE_NAME=$(gcloud dns managed-zones list \
-              --project ${{ env.PROJECT_ID }} \
-              --format="value(name)" \
-              --filter="dnsName=$DNS_ZONE." | head -1 || echo "")
- 
-            if [ -z "$ZONE_NAME" ]; then
-              echo "WARNING: DNS zone not found for $DNS_ZONE — skipping DNS check"
-              continue
-            fi
- 
-            EXISTING_RECORD=$(gcloud dns record-sets list \
-              --zone="$ZONE_NAME" \
-              --project ${{ env.PROJECT_ID }} \
-              --filter="name=$HOST." \
-              --format="value(rrdatas[0])" 2>/dev/null || echo "")
- 
-            if [ -z "$EXISTING_RECORD" ]; then
-              echo "INFO: DNS record for $HOST not yet created — point it to $IP_ADDRESS after ingress is provisioned"
-              DNS_RECORDS_VALID=false
-            elif [ "$EXISTING_RECORD" == "$IP_ADDRESS" ]; then
-              echo "OK: $HOST -> $IP_ADDRESS"
-            else
-              echo "WARNING: $HOST points to $EXISTING_RECORD (expected $IP_ADDRESS)"
-              DNS_RECORDS_VALID=false
-            fi
-          done
- 
-          echo "DNS_RECORDS_VALID=$DNS_RECORDS_VALID" >> $GITHUB_ENV
- 
-      # ------------------------------------------------------------------
-      # 9. Install GKE auth plugin
+      # 8. Install GKE auth plugin
       # ------------------------------------------------------------------
       - name: Install gke-gcloud-auth-plugin
         run: |
           gcloud components install gke-gcloud-auth-plugin --quiet
- 
+
       # ------------------------------------------------------------------
-      # 10. Connect to GKE cluster
+      # 9. Connect to GKE cluster
       # ------------------------------------------------------------------
       - name: Connect to GKE cluster
         run: |
           gcloud container clusters get-credentials ${{ github.event.inputs.gke_cluster_name }} \
             --region ${{ github.event.inputs.cluster_region }} \
             --project ${{ env.PROJECT_ID }}
- 
+
       # ------------------------------------------------------------------
-      # 11. Apply YAMLs in dependency order
-      #     namespace → cert → ssl → cloudarmor → ingress
+      # 10. Apply YAMLs in dependency order
+      #     namespace -> cert -> ssl -> cloudarmor -> gateway -> httproute
+      #     NOTE: ingress.yml is no longer used - replaced by Gateway API
       # ------------------------------------------------------------------
       - name: Apply Kubernetes manifests in order
         run: |
           DIR="${{ github.event.inputs.directory }}"
- 
+
           apply_if_exists() {
             local FILE="$DIR/$1"
             if [ -f "$FILE" ]; then
@@ -266,34 +215,48 @@ jobs:
               echo "Skipping (not found): $FILE"
             fi
           }
- 
+
           apply_if_exists "namespace.yml"
           apply_if_exists "certificate.yml"
           apply_if_exists "ssl.yml"
           apply_if_exists "cloudarmor.yml"
-          apply_if_exists "ingress.yml"
- 
+          apply_if_exists "gateway.yml"
+          apply_if_exists "httproute.yml"
+
       # ------------------------------------------------------------------
-      # 12. Show ingress and certificate status after apply
+      # 11. Show status after apply
       # ------------------------------------------------------------------
-      - name: Show Ingress status
+      - name: Show Gateway status
         run: |
           ENV="${{ github.event.inputs.environment }}"
           NAMESPACE="dhg-rateauto-${ENV}-namespace"
- 
+
           echo "=============================="
-          echo "Ingress resources:"
+          echo "Gateway resources:"
           echo "=============================="
-          kubectl get ingress -n $NAMESPACE -o wide || true
- 
+          kubectl get gateway -n $NAMESPACE -o wide || true
+
+          echo ""
+          echo "=============================="
+          echo "HTTPRoute resources:"
+          echo "=============================="
+          kubectl get httproute -n $NAMESPACE || true
+
           echo ""
           echo "=============================="
           echo "ManagedCertificate status:"
           echo "=============================="
           kubectl get managedcertificate -n $NAMESPACE || true
- 
+
           echo ""
           echo "=============================="
           echo "BackendConfig status:"
           echo "=============================="
           kubectl get backendconfig -n $NAMESPACE || true
+
+          echo ""
+          echo "=============================="
+          echo "GCP Backend Services:"
+          echo "=============================="
+          gcloud compute backend-services list \
+            --project=dhg-vaccine-rateauto-nonpord --global || true
