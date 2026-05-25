@@ -1,0 +1,12 @@
+# GCPBackendPolicy for dhg-vaccinefee-api-service
+# Ensures GCP LB health check uses correct path
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: dhg-vaccinefee-api-backend-policy
+  namespace: dhg-rateauto-dev-namespace
+spec:
+  targetRef:
+    group: ""
+    kind: Service
+    name: dhg-vaccinefee-api-service
