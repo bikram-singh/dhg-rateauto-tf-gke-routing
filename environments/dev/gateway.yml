@@ -3,8 +3,6 @@ kind: Gateway
 metadata:
   name: dhg-rateauto-dev-gateway
   namespace: dhg-rateauto-dev-namespace
-  annotations:
-    networking.gke.io/managed-certificates: dhg-rateauto-dev-cert
 spec:
   gatewayClassName: gke-l7-global-external-managed
   listeners:
@@ -17,7 +15,7 @@ spec:
       tls:
         mode: Terminate
         options:
-          networking.gke.io/pre-shared-certs: dhg-rateauto-dev-cert
+          networking.gke.io/pre-shared-certs: dhg-rateauto-dev-ssl-cert
     - name: http
       protocol: HTTP
       port: 80
