@@ -1,0 +1,36 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: dhg-rateauto-dev-httproute
+  namespace: dhg-rateauto-dev-namespace
+spec:
+  parentRefs:
+    - name: dhg-rateauto-dev-gateway
+      namespace: dhg-rateauto-dev-namespace
+  hostnames:
+    - gcpcloudhub.shop
+  rules:
+    # Vaccine Fee - New UI
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /vaccinefee-ui
+      backendRefs:
+        - name: dhg-vaccinefee-ui-service
+          port: 80
+    # Vaccine Fee - API (backend - coming soon)
+    # - matches:
+    #     - path:
+    #         type: PathPrefix
+    #         value: /vaccinefee/api
+    #   backendRefs:
+    #     - name: dhg-rateauto-vaccinefee-service
+    #       port: 5000
+    # Vaccine Fee - Backend UI (coming soon)
+    # - matches:
+    #     - path:
+    #         type: PathPrefix
+    #         value: /vaccinefee
+    #   backendRefs:
+    #     - name: dhg-rateauto-vaccinefee-service
+    #       port: 80

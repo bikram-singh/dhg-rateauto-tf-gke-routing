@@ -1,0 +1,29 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: dhg-rateauto-dev-gateway
+  namespace: dhg-rateauto-dev-namespace
+  annotations:
+    networking.gke.io/managed-certificates: dhg-rateauto-dev-cert
+spec:
+  gatewayClassName: gke-l7-global-external-managed
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      allowedRoutes:
+        namespaces:
+          from: Same
+      tls:
+        mode: Terminate
+        options:
+          networking.gke.io/pre-shared-certs: dhg-rateauto-dev-cert
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+  addresses:
+    - type: NamedAddress
+      value: dhg-rateauto-dev-static-ip
