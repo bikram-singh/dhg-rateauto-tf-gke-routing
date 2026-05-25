@@ -10,11 +10,19 @@ spec:
   hostnames:
     - gcpcloudhub.shop
   rules:
-    # Vaccine Fee - New UI
+    # Vaccine Fee - UI and all its static assets
     - matches:
         - path:
             type: PathPrefix
             value: /vaccinefee-ui
+      backendRefs:
+        - name: dhg-vaccinefee-ui-service
+          port: 80
+    # Static assets for Vaccine Fee UI
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /static
       backendRefs:
         - name: dhg-vaccinefee-ui-service
           port: 80
