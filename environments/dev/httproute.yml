@@ -8,9 +8,9 @@ spec:
     - name: dhg-rateauto-dev-gateway
       namespace: dhg-rateauto-dev-namespace
   hostnames:
-    - gcpcloudhub.shop
+    - dev.gcpcloudhub.shop
   rules:
-    # Vaccine Fee - UI and all its static assets
+    # Vaccine Fee - UI and all sub-paths
     - matches:
         - path:
             type: PathPrefix
@@ -18,7 +18,7 @@ spec:
       backendRefs:
         - name: dhg-vaccinefee-ui-service
           port: 80
-    # Static assets for Vaccine Fee UI
+    # Static assets
     - matches:
         - path:
             type: PathPrefix

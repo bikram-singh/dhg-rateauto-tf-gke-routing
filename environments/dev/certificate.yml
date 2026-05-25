@@ -5,4 +5,4 @@ metadata:
   namespace: dhg-rateauto-dev-namespace
 spec:
   domains:
-    - gcpcloudhub.shop
+    - dev.gcpcloudhub.shop

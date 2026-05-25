@@ -15,7 +15,7 @@ spec:
       tls:
         mode: Terminate
         options:
-          networking.gke.io/pre-shared-certs: dhg-rateauto-dev-ssl-cert
+          networking.gke.io/pre-shared-certs: dhg-rateauto-dev-subdomain-cert
     - name: http
       protocol: HTTP
       port: 80
