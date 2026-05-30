@@ -1,9 +1,11 @@
 <div align="center">
 
+<img src="docs/gallery/DHG_logo.png" alt="DHG Logo" width="90" height="90"/>
+
 # 🌐 dhg-rateauto-tf-gke-routing
 
 ### Terraform · GKE Gateway API · HTTPS Routing · SSL Termination
-### DHG Rate Automation Platform — `dhg-vaccine-rateauto-nonpord`
+### DHG Rate Automation Platform - `dhg-vaccine-rateauto-nonpord`
 
 [![Terraform](https://img.shields.io/badge/Terraform-%3E%3D1.4-7B42BC?logo=terraform&logoColor=white)](https://www.terraform.io)
 [![GKE Gateway API](https://img.shields.io/badge/GKE-Gateway_API-4285F4?logo=google-cloud&logoColor=white)](https://cloud.google.com/kubernetes-engine/docs/concepts/gateway-api)
@@ -13,7 +15,7 @@
 
 ---
 
-*Provisions GKE Gateway API resources — Static IP, HTTPS Gateway, HTTPRoutes, and SSL certificates — to route external traffic to the DHG Vaccine Fee dashboard running on GKE Autopilot.*
+*Provisions GKE Gateway API resources - Static IP, HTTPS Gateway, HTTPRoutes, and SSL certificates - to route external traffic to the DHG Vaccine Fee dashboard running on GKE Autopilot.*
 
 </div>
 
@@ -22,6 +24,7 @@
 ## 📋 Table of Contents
 
 - [Overview](#-overview)
+- [UI Gallery](#-ui-gallery)
 - [Why Gateway API Over Ingress](#-why-gateway-api-over-ingress)
 - [Architecture](#-architecture)
 - [Traffic Flow](#-traffic-flow)
@@ -44,13 +47,13 @@
 
 ## 🌐 Overview
 
-This repository is the **third and final infrastructure layer** of the DHG Rate Automation platform. It provisions the network routing layer that connects the public internet to the private GKE Autopilot workloads — using the modern **GKE Gateway API** instead of the legacy Kubernetes Ingress.
+This repository is the **third and final infrastructure layer** of the DHG Rate Automation platform. It provisions the network routing layer that connects the public internet to the private GKE Autopilot workloads - using the modern **GKE Gateway API** instead of the legacy Kubernetes Ingress.
 
 It configures:
 - 🔒 **HTTPS-only** access with automatic SSL certificate management
 - 🌍 A **static external IP** (`8.232.155.177`) bound to the domain `dev.gcpcloudhub.shop`
-- 🔀 **Path-based routing** — different URL prefixes route to different backend services
-- 🚦 **HTTP → HTTPS redirect** — all plain HTTP traffic is automatically upgraded
+- 🔀 **Path-based routing** - different URL prefixes route to different backend services
+- 🚦 **HTTP → HTTPS redirect** - all plain HTTP traffic is automatically upgraded
 
 This repo is deployed **after** the GKE cluster is running (`dhg-rateauto-tf-gke`) and **before** the application CI/CD pipelines push container images.
 
@@ -67,6 +70,31 @@ This repo is deployed **after** the GKE cluster is running (`dhg-rateauto-tf-gke
 | 🔄 Routing method | GKE Gateway API (not Kubernetes Ingress) |
 
 ---
+
+## 🖼️ UI Gallery
+
+> 📌 **Note:** All images are stored in `docs/gallery/`. Upload your screenshots there to display them here.
+
+### 🌐 GKE Gateway - GCP Console
+![GKE Gateway Console](docs/gallery/routing-gateway-console.png)
+
+---
+
+### 🔀 HTTPRoutes - Routing Rules
+![HTTPRoutes](docs/gallery/routing-httproutes.png)
+
+---
+
+### 🔒 SSL Policy
+![SSL Policy](docs/gallery/routing-ssl-policy.png)
+
+---
+
+### 📋 Gateway Resource View
+![Gateway Resource View](docs/gallery/gateway-resource-view.png)
+
+---
+
 
 ## ⚡ Why Gateway API Over Ingress
 
@@ -165,7 +193,7 @@ Step 4:  GKE Gateway evaluates the request
          Matches path prefix /vaccinefee-ui
          │
 Step 5:  HTTPRoute forwards to Kubernetes Service dhg-vaccinefee-ui
-         on port 8080 (ClusterIP — no public IP)
+         on port 8080 (ClusterIP - no public IP)
          │
 Step 6:  Service load balances to one of the React+nginx Pods
          Pod serves the React SPA (Single Page Application)
@@ -240,7 +268,7 @@ gcloud services enable \
 | # | Resource | Type | Description |
 |---|---|---|---|
 | 1 | `google_compute_global_address` | GCP | Static external IP (`8.232.155.177`) |
-| 2 | `kubernetes_manifest` (Gateway) | K8s | GKE Gateway — global HTTPS load balancer |
+| 2 | `kubernetes_manifest` (Gateway) | K8s | GKE Gateway - global HTTPS load balancer |
 | 3 | `kubernetes_manifest` (HTTPRoute UI) | K8s | Routes `/vaccinefee-ui` → Frontend Service |
 | 4 | `kubernetes_manifest` (HTTPRoute API) | K8s | Routes `/vaccinefee/api` → Backend Service |
 | 5 | `kubernetes_manifest` (HTTPRoute redirect) | K8s | HTTP → HTTPS 301 redirect |
@@ -275,7 +303,7 @@ spec:
       port: 80
 ```
 
-**`gke-l7-global-external-managed-mc`** is the GKE-managed GatewayClass that provisions a **Global External HTTP(S) Load Balancer** — the same enterprise-grade load balancer used by Google's own products. It provides:
+**`gke-l7-global-external-managed-mc`** is the GKE-managed GatewayClass that provisions a **Global External HTTP(S) Load Balancer** - the same enterprise-grade load balancer used by Google's own products. It provides:
 - ✅ Anycast IP routing (closest Google edge POP)
 - ✅ DDoS protection at the network layer
 - ✅ Automatic SSL certificate renewal
@@ -288,7 +316,7 @@ spec:
 
 Two separate `HTTPRoute` resources handle the routing:
 
-### Frontend Route — React Dashboard
+### Frontend Route - React Dashboard
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -311,7 +339,7 @@ spec:
           port: 8080
 ```
 
-### Backend Route — FastAPI
+### Backend Route - FastAPI
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -361,7 +389,7 @@ spec:
 | `https://dev.gcpcloudhub.shop/vaccinefee-ui/*` | UI HTTPRoute | `dhg-vaccinefee-ui` | 8080 |
 | `https://dev.gcpcloudhub.shop/vaccinefee/api/*` | API HTTPRoute | `dhg-vaccinefee-api` | 8080 |
 | `https://dev.gcpcloudhub.shop/vaccinefee/api/docs` | API HTTPRoute | Swagger UI | 8080 |
-| `http://dev.gcpcloudhub.shop/*` | Redirect HTTPRoute | → 301 HTTPS | — |
+| `http://dev.gcpcloudhub.shop/*` | Redirect HTTPRoute | → 301 HTTPS | - |
 
 ---
 
@@ -380,11 +408,11 @@ resource "google_compute_managed_ssl_certificate" "dhg_ssl" {
 ```
 
 Google-managed certificates are **fully automatic**:
-- ✅ **Provisioned automatically** — no manual CSR generation
-- ✅ **Renewed automatically** — 30 days before expiry
-- ✅ **Free** — no certificate authority costs
-- ✅ **Domain validated** — Google verifies DNS ownership
-- ✅ **TLS 1.2+** — older TLS versions blocked automatically
+- ✅ **Provisioned automatically** - no manual CSR generation
+- ✅ **Renewed automatically** - 30 days before expiry
+- ✅ **Free** - no certificate authority costs
+- ✅ **Domain validated** - Google verifies DNS ownership
+- ✅ **TLS 1.2+** - older TLS versions blocked automatically
 
 ### Certificate Provisioning Timeline
 
@@ -423,28 +451,28 @@ Using a **reserved static IP** rather than ephemeral:
 
 | Variable | Type | Default | Required | Description |
 |---|---|---|---|---|
-| `project_id` | `string` | — | ✅ | GCP project ID |
+| `project_id` | `string` | - | ✅ | GCP project ID |
 | `region` | `string` | `us-central1` | No | GCP region |
-| `stage` | `string` | — | ✅ | Environment: `dev`, `test`, `stage`, `prod` |
-| `cluster_name` | `string` | — | ✅ | GKE cluster name to deploy routes into |
-| `namespace` | `string` | — | ✅ | Kubernetes namespace for all resources |
+| `stage` | `string` | - | ✅ | Environment: `dev`, `test`, `stage`, `prod` |
+| `cluster_name` | `string` | - | ✅ | GKE cluster name to deploy routes into |
+| `namespace` | `string` | - | ✅ | Kubernetes namespace for all resources |
 
 ### 🌐 Networking
 
 | Variable | Type | Default | Required | Description |
 |---|---|---|---|---|
-| `domain` | `string` | — | ✅ | Domain name for HTTPS (e.g. `dev.gcpcloudhub.shop`) |
-| `static_ip_name` | `string` | — | ✅ | Name for the reserved global static IP |
-| `gateway_name` | `string` | — | ✅ | Name for the GKE Gateway resource |
+| `domain` | `string` | - | ✅ | Domain name for HTTPS (e.g. `dev.gcpcloudhub.shop`) |
+| `static_ip_name` | `string` | - | ✅ | Name for the reserved global static IP |
+| `gateway_name` | `string` | - | ✅ | Name for the GKE Gateway resource |
 
 ### 🔀 Routing
 
 | Variable | Type | Default | Required | Description |
 |---|---|---|---|---|
-| `frontend_service_name` | `string` | — | ✅ | K8s Service name for the React frontend |
+| `frontend_service_name` | `string` | - | ✅ | K8s Service name for the React frontend |
 | `frontend_service_port` | `number` | `8080` | No | Frontend service port |
 | `frontend_path_prefix` | `string` | `/vaccinefee-ui` | No | URL path prefix for frontend routes |
-| `backend_service_name` | `string` | — | ✅ | K8s Service name for the FastAPI backend |
+| `backend_service_name` | `string` | - | ✅ | K8s Service name for the FastAPI backend |
 | `backend_service_port` | `number` | `8080` | No | Backend service port |
 | `backend_path_prefix` | `string` | `/vaccinefee/api` | No | URL path prefix for API routes |
 
@@ -632,9 +660,9 @@ terraform destroy -var-file=environments/dev.tfvars
 | **HTTPS enforced** | HTTP automatically redirects to HTTPS (301) |
 | **TLS 1.2+** | Older TLS versions rejected by Google LB |
 | **Google-managed cert** | Auto-renewed, domain-validated |
-| **No public node IPs** | All routing goes through the Gateway — nodes are private |
+| **No public node IPs** | All routing goes through the Gateway - nodes are private |
 | **Static IP control** | Reserved IP prevents hijacking |
-| **WIF only** | No JSON keys stored — CI/CD uses short-lived OIDC tokens |
+| **WIF only** | No JSON keys stored - CI/CD uses short-lived OIDC tokens |
 | **Namespace isolation** | All K8s resources in `dhg-rateauto-dev-namespace` |
 
 ### 🔐 SSL/TLS Configuration
@@ -656,7 +684,7 @@ User → Google Edge (anycast) → TLS termination → Gateway
                                               Pod (no public IP)
 ```
 
-No traffic ever reaches the GKE nodes directly from the internet — everything is channeled through the managed load balancer.
+No traffic ever reaches the GKE nodes directly from the internet - everything is channeled through the managed load balancer.
 
 ---
 
@@ -705,7 +733,7 @@ provider "kubernetes" {
 }
 ```
 
-The **Kubernetes provider** authenticates using the GKE cluster endpoint and Google access token obtained via WIF — no kubeconfig file or service account keys needed.
+The **Kubernetes provider** authenticates using the GKE cluster endpoint and Google access token obtained via WIF - no kubeconfig file or service account keys needed.
 
 ---
 
@@ -715,7 +743,7 @@ The **Kubernetes provider** authenticates using the GKE cluster endpoint and Goo
 |---|---|---|
 | [`dhg-rateauto-tf-vpc`](https://github.com/bikram-singh/dhg-rateauto-tf-vpc) | VPC, Subnet, NAT, Firewall | 1️⃣ First |
 | [`dhg-rateauto-tf-gke`](https://github.com/bikram-singh/dhg-rateauto-tf-gke) | GKE Autopilot Cluster | 2️⃣ Second |
-| [`dhg-rateauto-tf-gke-routing`](https://github.com/bikram-singh/dhg-rateauto-tf-gke-routing) | **This repo** — Gateway API, HTTPS, Routing | 3️⃣ Third |
+| [`dhg-rateauto-tf-gke-routing`](https://github.com/bikram-singh/dhg-rateauto-tf-gke-routing) | **This repo** - Gateway API, HTTPS, Routing | 3️⃣ Third |
 | [`dhg-rateauto-tf-gcs-buckets`](https://github.com/bikram-singh/dhg-rateauto-tf-gcs-buckets) | GCS Bucket Provisioning | 4️⃣ Independent |
 | [`dhg-rateauto-api-backend`](https://github.com/bikram-singh/dhg-rateauto-api-backend) | FastAPI Backend | 5️⃣ App layer |
 | [`dhg-rateauto-ui-frontend`](https://github.com/bikram-singh/dhg-rateauto-ui-frontend) | React Frontend Dashboard | 5️⃣ App layer |
